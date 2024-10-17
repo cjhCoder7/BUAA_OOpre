@@ -1,5 +1,7 @@
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 public class Adventure implements Commodity {
     private final int id;
@@ -114,9 +116,12 @@ public class Adventure implements Commodity {
                 packages.put(id, newThing);
             }
         } else {
-            for (Commodity thing : packages.values()) {
+            Iterator<Map.Entry<Integer, Commodity>> iter = packages.entrySet().iterator();
+            while (iter.hasNext()) {
+                Map.Entry<Integer, Commodity> entry = iter.next();
+                Commodity thing = entry.getValue();
                 if (thing instanceof Equipment && thing.getName().equals(newThing.getName())) {
-                    packages.remove(thing.getId());
+                    iter.remove();
                 }
             }
             packages.put(id, newThing);
