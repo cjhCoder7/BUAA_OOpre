@@ -391,4 +391,91 @@ System.setOut(ps);
 ps.close();
 ```
 
-最后，提一个小建议，我发现在 oopre 的 Junit 评测系统里，子类里面的继承的方法也是要算上去的，要提高一下覆盖率可以试一试给子类也写一些 test。
+最后，提一个小建议，我发现在 OOpre 的 Junit 评测系统里，子类里面的继承的方法也是要算上去的，要提高一下覆盖率可以试一试给子类也写一些 test。
+
+#### 10.17 更新
+
+最新消息，强测寄掉了！！！😨😨😨😨😨😨😨😨😨😨😨😨😨
+
+啊啊啊啊啊，这次的作业真是的，以前连中测都只会提交一次就过，强测没啥问题，结果这次是中测磕磕绊绊，强测只过两个点~~~
+
+看了一下，剩下八个没过的点出现的原因是**在使用HashMap遍历并进行删除时，没有使用迭代器导致了程序运行时出错**
+
+原代码是这样的
+
+```java
+for (Commodity thing : packages.values()) {
+	if (thing instanceof Equipment && thing.getName().equals(newThing.getName())) {
+        packages.remove(thing.getId());
+    }
+}
+packages.put(id, newThing);
+```
+
+之后更改为迭代器遍历就对了（<u>第一次使用Bug修复界面，第一次提交还给我卡Bug了，一直是waiting没有结果</u>🤐🤐🤐）
+
+```java
+Iterator<Map.Entry<Integer, Commodity>> iter = packages.entrySet().iterator();
+while (iter.hasNext()) {
+    Map.Entry<Integer, Commodity> entry = iter.next();
+    Commodity thing = entry.getValue();
+    if (thing instanceof Equipment && thing.getName().equals(newThing.getName())) {
+        iter.remove();
+    }
+}
+packages.put(id, newThing);
+```
+
+#### 迭代器遍历删除
+
+根据这个错误，我简单了解了一下使用Java容器进行遍历删除时应该要注意的点 🤐 （来源 chatGPT3.5）
+
+##### 为什么使用 `Iterator.remove()` 不会报错？😩
+
+因为 `Iterator` 自带删除机制，它知道当前迭代到了哪个元素，并且可以在**内部同步更新**集合的状态，而不会让集合的结构变得不一致。
+
+###### 详细解释
+- **迭代器内部跟踪状态**：`Iterator` 记录了当前迭代的位置，并知道下一个要遍历的元素。如果在迭代器的控制下删除当前元素，它可以安全地更新迭代的状态。
+- **`Iterator.remove()` 方法是与迭代器状态同步的**：当你调用 `Iterator.remove()`，它不会引发 `ConcurrentModificationException`，因为：
+  - 它并不会触发 `modCount` 的不一致性检查。
+  - 它确保了删除当前迭代的元素后，`Iterator` 的状态仍然保持一致，且能够正确地继续迭代后续的元素。
+
+##### 为什么使用 `Iterator.remove()` 会作用于原始集合？😣
+
+###### 1. `Iterator` 是直接作用于原始集合的
+
+当你调用 `packages.entrySet().iterator()` 时，`Iterator` 并没有创建原始集合的副本，而是直接操作 `packages` 集合中的元素。
+
+- `packages.entrySet()` 返回的是 `HashMap` 的一个视图，表示其中所有键值对的集合。
+- `entrySet()` 是基于原始 `HashMap` 的一个视图集合，因此 `Iterator` 操作这个 `entrySet()`，相当于直接操作 `packages`。
+
+###### 2. `Iterator.remove()` 修改的是原集合
+
+当你调用 `iter.remove()` 时，实际上是删除了正在被迭代的 `entrySet` 中的元素。而因为 `entrySet` 本身只是 `packages` 的键值对视图，所以这个操作直接影响 `packages`。
+
+操作流程如下：
+
+- `packages.entrySet()` 返回 `packages` 的一个 **视图**，允许你遍历其中的键值对。
+- 当你用 `Iterator` 遍历这个 `entrySet` 时，实际上遍历的就是 `packages` 本身的元素。
+- 当你调用 `iter.remove()`，删除的就是 `entrySet` 中的当前元素，而由于 `entrySet` 是直接与 `packages` 绑定的，这意味着 `packages` 中相应的元素也会被删除。🧐
+
+##### Java 迭代器的“fail-fast”机制 😶
+
+在遍历像 `HashMap` 这样的集合时，Java 的迭代器使用了一种称为 **fail-fast（快速失败）** 的机制。这个机制会检测集合在迭代期间是否被修改，如果发现不当修改（比如在不通过迭代器的情况下直接修改集合），就会抛出 `ConcurrentModificationException`。
+
+###### 工作原理
+- `HashMap` 中的 `entrySet().iterator()` 或 `for-each` 循环实际上都依赖于一个迭代器。
+- 每当你遍历时，迭代器会保存一个**修改计数器（`modCount`）**，它记录集合的结构性修改次数。
+- 当你调用集合的修改方法（如 `put()`、`remove()`）而不是使用迭代器的 `remove()` 时，`modCount` 会增加。
+- 在每次调用 `next()` 方法时，迭代器会检查当前的 `modCount` 是否与创建迭代器时的值相同。如果 `modCount` 不匹配，说明集合在迭代过程中被修改，迭代器就会抛出 `ConcurrentModificationException`。
+
+##### 为什么在数据量小时不会报错？😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫
+
+这是因为 **fail-fast** 机制并不能保证每次修改都会抛出异常。Java 迭代器的“fail-fast”机制是一个**最佳努力**（best-effort）机制，它**不保证**在所有情况下都会立即检测到结构性修改。实际上，**小数据集或少量修改操作**时，迭代器未必能够立即检测到不当修改，可能因为：
+
+- **数据较少时，迭代器没有机会调用足够多的 `next()` 方法**：
+  - 例如，迭代器没有在每次修改后都进行检查，而你可能很快就完成了循环。修改的检测可能会在迭代器的下一次调用 `next()` 时才会发生，而不是每次都立即触发。
+  - 如果集合较小或遍历过程中修改次数较少，可能迭代器根本不会检测到问题，导致没有抛出异常。
+
+- **结构性的修改没有破坏底层结构**：
+  - 如果在迭代过程中对数据结构的修改没有立即破坏集合的内部结构（如重新散列、链表变化等），短时间内可能不会触发异常。
