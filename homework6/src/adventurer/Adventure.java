@@ -225,30 +225,24 @@ public class Adventure implements Commodity, Watcher, Observed {
     }
 
     public void attackAdventures(String name, ArrayList<Adventure> attacks, String type) {
-        int maxDef1 = 0;
-        for (Adventure adventure : attacks) {
-            if (adventure.getDef() > maxDef1) {
-                maxDef1 = adventure.getDef();
-            }
-        }
+        int maxDef1 = attacks.stream().mapToInt(Adventure::getDef).max().orElse(0);
         HashSet<Adventure> totalAttacks = new HashSet<>();
         for (Adventure adventure : attacks) {
             int currentDepth = 1;
             totalAttacks.add(adventure);
             adventure.findAttacks(totalAttacks, currentDepth);
         }
-        int maxDef2 = 0;
-        for (Adventure adventure : totalAttacks) {
-            if (adventure.getDef() > maxDef2) {
-                maxDef2 = adventure.getDef();
-            }
-        }
+        int maxDef2 = totalAttacks.stream().mapToInt(Adventure::getDef).max().orElse(0);
         for (Commodity thing : packages.values()) {
             if (thing.getName().equals(name) && thing instanceof Equipment) {
                 Equipment equipment = (Equipment) thing;
                 switch (type) {
                     case "normal":
                         if (this.atk + equipment.getCe() > maxDef1) {
+                            ArrayList<Integer> attacksHitPoint = new ArrayList<>();
+                            for (Adventure adventure : attacks) {
+                                attacksHitPoint.add(adventure.getHitPoint());
+                            }
                             for (Adventure adventure : attacks) {
                                 adventure.attackedByAdventure(this, equipment, type);
                             }
@@ -256,6 +250,11 @@ public class Adventure implements Commodity, Watcher, Observed {
                             if (equipment.getDurability() == 0) {
                                 packages.remove(equipment.getId());
                                 things.remove(equipment.getId());
+                            }
+                            for (int i = 0; i < attacksHitPoint.size(); i++) {
+                                if (attacks.get(i).getHitPoint() <= attacksHitPoint.get(i) / 2) {
+                                    attacks.get(i).notifyObservers();
+                                }
                             }
                         } else {
                             System.out.println("Adventurer" + " " + this.id + " " + "defeated");
@@ -319,7 +318,6 @@ public class Adventure implements Commodity, Watcher, Observed {
 
     public int attackedByAdventure(Adventure attackAdventure, Equipment equipment, String type) {
         String equipmentType = equipment.getType();
-        int before = this.hitPoint;
         int loss = 0;
         switch (equipmentType) {
             case "Axe":
@@ -338,9 +336,6 @@ public class Adventure implements Commodity, Watcher, Observed {
         }
         switch (type) {
             case "normal":
-                if (this.hitPoint <= before / 2) {
-                    this.notifyObservers();
-                }
                 System.out.println(this.name + " " + this.hitPoint);
                 return 0;
             case "chain":
